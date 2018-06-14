@@ -1,1 +1,2 @@
-# pix2pix in tensorflow.js
+# pix2pix in deeplearn.js simple
+
