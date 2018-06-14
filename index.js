@@ -1,29 +1,27 @@
 const SIZE = 256;
 
 function mlmodel(input, weights) {
-  const math = dl.ENV.math
-
   function preprocess(input) {
-    return math.subtract(math.multiply(input, dl.Scalar.new(2)), dl.Scalar.new(1))
+    return tf.sub(tf.mul(input, tf.scalar(2)), tf.scalar(1))
   }
 
   function deprocess(input) {
-    return math.divide(math.add(input, dl.Scalar.new(1)), dl.Scalar.new(2))
+    return tf.div(tf.add(input, tf.scalar(1)), tf.scalar(2))
   }
 
   function batchnorm(input, scale, offset) {
-    let moments = math.moments(input, [0, 1])
+    let moments = tf.moments(input, [0, 1])
     const varianceEpsilon = 1e-5
-    return math.batchNormalization3D(input, moments.mean, moments.variance, varianceEpsilon, scale, offset)
+    return tf.batchNormalization(input, moments.mean, moments.variance, varianceEpsilon, scale, offset)
   }
 
   function conv2d(input, filter, bias) {
-    return math.conv2d(input, filter, bias, [2, 2], "same")
+    return tf.conv2d(input, filter, [2, 2], "same")
   }
 
   function deconv2d(input, filter, bias) {
-    let convolved = math.conv2dTranspose(input, filter, [input.shape[0]*2, input.shape[1]*2, filter.shape[2]], [2, 2], "same")
-    let biased = math.add(convolved, bias)
+    let convolved = tf.conv2dTranspose(input, filter, [input.shape[0]*2, input.shape[1]*2, filter.shape[2]], [2, 2], "same")
+    let biased = tf.add(convolved, bias)
     return biased
   }
 
@@ -41,7 +39,7 @@ function mlmodel(input, weights) {
     let filter = weights[scope + "/conv2d/kernel"]
     let bias = weights[scope + "/conv2d/bias"]
     let layer_input = layers[layers.length - 1]
-    let rectified = math.leakyRelu(layer_input, 0.2)
+    let rectified = tf.leakyRelu(layer_input, 0.2)
     let convolved = conv2d(rectified, filter, bias)
     let scale = weights[scope + "/batch_normalization/gamma"]
     let offset = weights[scope + "/batch_normalization/beta"]
@@ -55,9 +53,9 @@ function mlmodel(input, weights) {
       layer_input = layers[layers.length - 1]
     } else {
       let skip_layer = i - 1
-      layer_input = math.concat3D(layers[layers.length - 1], layers[skip_layer], 2)
+      layer_input = tf.concat([layers[layers.length - 1], layers[skip_layer]], 2)
     }
-    let rectified = math.relu(layer_input)
+    let rectified = tf.relu(layer_input)
     let scope = "generator/decoder_" + i.toString()
     let filter = weights[scope + "/conv2d_transpose/kernel"]
     let bias = weights[scope + "/conv2d_transpose/bias"]
@@ -68,12 +66,12 @@ function mlmodel(input, weights) {
     layers.push(normalized)
   }
 
-  let layer_input = math.concat3D(layers[layers.length - 1], layers[0], 2)
-  rectified = math.relu(layer_input)
+  let layer_input = tf.concat([layers[layers.length - 1], layers[0]], 2)
+  rectified = tf.relu(layer_input)
   filter = weights["generator/decoder_1/conv2d_transpose/kernel"]
   bias = weights["generator/decoder_1/conv2d_transpose/bias"]
   convolved = deconv2d(rectified, filter, bias)
-  rectified = math.tanh(convolved)
+  rectified = tf.tanh(convolved)
   layers.push(rectified)
 
   let output = layers[layers.length - 1]
@@ -85,10 +83,11 @@ function mlmodel(input, weights) {
 function setup() {
   fetch_weight('/models/edges2pikachu_AtoB.pict')
   .then(weights => {
-    const math = dl.ENV.math
     let imgElement = document.getElementById('input')
-    let input = dl.Array3D.fromPixels(imgElement)
-    const normalized_input = math.divide(input, dl.Scalar.new(255.));
+    let input = tf.fromPixels(imgElement)
+    inputData = input.dataSync()
+    const float_input = tf.tensor3d(inputData, input.shape)
+    const normalized_input = tf.div(float_input, tf.scalar(255.))
     let output_rgb = mlmodel(normalized_input, weights)
     let outputImg = array3DToImage(output_rgb);
     createImg(outputImg.src).parent('output');

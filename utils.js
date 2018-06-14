@@ -48,8 +48,8 @@ async function fetch_weight(path) {
         let shape = shapes[i].shape
         let size = shape.reduce((total, num) => total * num)
         let values = arr.slice(offset, offset+size)
-        let dlarr = dl.Array1D.new(values, "float32")
-        weights[shapes[i].name] = dlarr.reshape(shape)
+        let tfarr = tf.tensor1d(values, "float32")
+        weights[shapes[i].name] = tfarr.reshape(shape)
         offset += size
       }
       weights_cache[path] = weights
